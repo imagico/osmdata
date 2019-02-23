@@ -52,7 +52,7 @@ time ogr2ogr -f "PostgreSQL" PG:"dbname=${PGDATABASE} user=${PGUSER}" \
 #    -s_srs "EPSG:4326" -t_srs "EPSG:${srid}" -skipfailures -spat $bounds_geographic \
 #    $noice_source noice
 
-psql -1 -c "CREATE TABLE noice_${srid}(geom geometry, osm_id bigint, tags jsonb);COPY noice_${srid} FROM stdin FREEZE;" < $noice_source
+psql -1 -c "DROP TABLE IF EXISTS noice_raw;CREATE TABLE noice_raw(geom geometry, osm_id bigint, tags jsonb);COPY noice_raw FROM stdin FREEZE;" < $noice_source
 
 
 # generates the non-overlapping grid

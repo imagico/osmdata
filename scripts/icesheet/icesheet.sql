@@ -16,6 +16,7 @@
 SELECT now() AS start_time \gset
 
 SELECT 'noice_' || :srid AS noice_table \gset
+SELECT 'noice_' || :srid || '_idx' AS noice_idx \gset
 SELECT 'ice_' || :srid AS ice_table \gset
 SELECT 'icep_tmp_' || :srid AS icep_tmp_table \gset
 SELECT 'ice_outlines_' || :srid AS ice_outlines_table \gset
@@ -30,7 +31,16 @@ SELECT 'ogrid_' || :srid AS ogrid_table \gset
 
 SELECT now() AS last_time \gset
 
-DELETE FROM :noice_table WHERE tags @> '{"supraglacial":"yes"}'::jsonb;
+DROP TABLE IF EXISTS :noice_table;
+
+CREATE TABLE :noice_table (
+    geom GEOMETRY(MULTIPOLYGON, :srid),
+    "type" TEXT
+);
+
+INSERT INTO :noice_table SELECT ST_Transform(geom, :srid), CASE WHEN tags @> '{"natural":"glacier"}'::jsonb THEN 'glacier' ELSE 'no_glacier' END AS "type" FROM noice_raw WHERE NOT(tags @> '{"supraglacial":"yes"}'::jsonb);
+
+CREATE INDEX :noice_idx ON :noice_table USING GIST (geom);
 
 DROP TABLE IF EXISTS :ice_table;
 
@@ -126,7 +136,7 @@ UPDATE :ice_tmp_table l1 SET geom = ST_CollectionExtract(ST_Multi(ST_Difference(
 -- mark those intersecting with glaciers
 UPDATE :ice_tmp_table l SET linetype = 5 WHERE linetype = 1 AND EXISTS
         (SELECT 1 FROM :noice_table n
-            WHERE ST_Intersects(n.geom, l.geom) AND n.tags @> '{"natural":"glacier"}'::jsonb);
+            WHERE ST_Intersects(n.geom, l.geom) AND n."type" = 'glacier');
 
 -- noice boundaries
 INSERT INTO :ice_tmp_table (x, y, linetype, geom)
@@ -134,7 +144,7 @@ INSERT INTO :ice_tmp_table (x, y, linetype, geom)
         -- this subquery needs to be exactly like the one above generating the lines initially
         -- to avoid any mismatches
         (SELECT COALESCE(ST_CollectionExtract(ST_Intersection(g.geom,
-            (SELECT ST_Boundary(ST_Union(n.geom)) FROM :noice_table n WHERE ST_Intersects(g.geom, n.geom) AND n.tags @> '{"natural":"glacier"}'::jsonb)
+            (SELECT ST_Boundary(ST_Union(n.geom)) FROM :noice_table n WHERE ST_Intersects(g.geom, n.geom) AND n."type" = 'glacier')
         ), 2), ST_SetSRID('GEOMETRYCOLLECTION EMPTY'::geometry, :srid))
         FROM :grid_table g WHERE g.x = l.x AND g.y = l.y)
     )), 2) AS geom
