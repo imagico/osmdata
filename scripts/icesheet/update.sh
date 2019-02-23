@@ -16,7 +16,7 @@ set -x
 mkdir -p $DATADIR
 
 # these are used by icesheet_proc.sh
-export OSM_SOURCE=${PLANETDIR}/planet.osm.pbf
+export OSM_SOURCE=$PLANETDIR/antarctica.osm.pbf
 export SRID=3857
 
 echo "Started icesheet/update.sh"
